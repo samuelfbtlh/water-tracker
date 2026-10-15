@@ -45,5 +45,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NotificationManager.shared.configure()
         ReminderScheduler.shared.start()
+        LoginItemManager.registerDefaultIfFirstLaunch()
     }
 }

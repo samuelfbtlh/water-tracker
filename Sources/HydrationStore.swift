@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import AppKit
+import SwiftUI
 
 struct Settings: Codable, Equatable {
     var bottleML: Int = 500
@@ -76,6 +77,18 @@ final class HydrationStore {
         settings = newSettings
         persist()
         ReminderScheduler.shared.recompute()
+    }
+
+    /// Binding genérico para um campo de Settings — usado pelos Steppers/Toggles do painel.
+    func binding<T>(_ keyPath: WritableKeyPath<Settings, T>) -> Binding<T> {
+        Binding(
+            get: { self.settings[keyPath: keyPath] },
+            set: { newValue in
+                var updated = self.settings
+                updated[keyPath: keyPath] = newValue
+                self.updateSettings(updated)
+            }
+        )
     }
 
     func last7Days() -> [(label: String, count: Int, isToday: Bool)] {

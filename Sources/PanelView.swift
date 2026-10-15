@@ -4,6 +4,8 @@ struct PanelView: View {
     @Bindable var store = HydrationStore.shared
     @Bindable var scheduler = ReminderScheduler.shared
 
+    @Bindable private var loginState = LoginItemUIState.shared
+
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
         f.locale = Locale(identifier: "pt_BR")
@@ -26,11 +28,7 @@ struct PanelView: View {
             ring
             buttons
             reminderLine
-            Button("Testar lembrete") {
-                NotificationManager.shared.postReminder()
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
+            settingsSection
             Divider()
             HStack {
                 Spacer()
@@ -129,6 +127,81 @@ struct PanelView: View {
         f.dateFormat = "HH:mm"
         return f
     }()
+
+    private var startHourBinding: Binding<Int> {
+        Binding(
+            get: { store.settings.startHour },
+            set: { newValue in
+                var s = store.settings
+                s.startHour = max(0, min(newValue, s.endHour - 1))
+                store.updateSettings(s)
+            }
+        )
+    }
+
+    private var endHourBinding: Binding<Int> {
+        Binding(
+            get: { store.settings.endHour },
+            set: { newValue in
+                var s = store.settings
+                s.endHour = min(23, max(newValue, s.startHour + 1))
+                store.updateSettings(s)
+            }
+        )
+    }
+
+    private var loginToggleBinding: Binding<Bool> {
+        Binding(
+            get: { loginState.enabled },
+            set: { newValue in loginState.setEnabled(newValue) }
+        )
+    }
+
+    private var settingsSection: some View {
+        DisclosureGroup("Ajustes") {
+            VStack(alignment: .leading, spacing: 10) {
+                Stepper(
+                    "Garrafa: \(store.settings.bottleML) ml",
+                    value: store.binding(\.bottleML), in: 100...3000, step: 50
+                )
+                Stepper(
+                    "Meta: \(store.settings.goalBottles) garrafas",
+                    value: store.binding(\.goalBottles), in: 1...20
+                )
+                Stepper(
+                    "Lembrar a cada \(store.settings.intervalMin) min",
+                    value: store.binding(\.intervalMin), in: 15...240, step: 15
+                )
+                Stepper(
+                    "Início: \(String(format: "%02d:00", store.settings.startHour))",
+                    value: startHourBinding, in: 0...23
+                )
+                Stepper(
+                    "Fim: \(String(format: "%02d:00", store.settings.endHour))",
+                    value: endHourBinding, in: 0...23
+                )
+                Toggle("Abrir ao iniciar sessão", isOn: loginToggleBinding)
+                if loginState.needsApproval {
+                    Button("Aprovar nos Ajustes") {
+                        LoginItemManager.openSettings()
+                    }
+                    .buttonStyle(.link)
+                }
+                if let error = loginState.errorMessage {
+                    Text(error)
+                        .font(.caption2)
+                        .foregroundStyle(.red)
+                }
+                Toggle("Mostrar contagem na barra", isOn: store.binding(\.showCountInBar))
+                Button("Testar lembrete") {
+                    NotificationManager.shared.postReminder()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            .padding(.top, 6)
+        }
+    }
 
     private var buttons: some View {
         VStack(spacing: 8) {
