@@ -43,6 +43,12 @@ struct GotaApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Usado pelo uninstall.sh: desregistra o login item e sai, sem abrir painel/notificações.
+        if CommandLine.arguments.contains("--unregister-login") {
+            LoginItemManager.setEnabled(false)
+            NSApp.terminate(nil)
+            return
+        }
         NotificationManager.shared.configure()
         ReminderScheduler.shared.start()
         LoginItemManager.registerDefaultIfFirstLaunch()
