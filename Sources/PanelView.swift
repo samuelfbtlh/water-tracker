@@ -28,6 +28,7 @@ struct PanelView: View {
             ring
             buttons
             reminderLine
+            weekStrip
             settingsSection
             Divider()
             HStack {
@@ -127,6 +128,26 @@ struct PanelView: View {
         f.dateFormat = "HH:mm"
         return f
     }()
+
+    private var weekStrip: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            ForEach(Array(store.last7Days().enumerated()), id: \.offset) { _, day in
+                let goal = max(1, store.settings.goalBottles)
+                let ratio = min(1.0, Double(day.count) / Double(goal))
+                let height = max(4, 36 * ratio)
+                let goalHit = day.count >= store.settings.goalBottles
+                VStack(spacing: 4) {
+                    Capsule()
+                        .fill(Color.blue.opacity(goalHit ? 1.0 : 0.45))
+                        .frame(width: 18, height: height)
+                        .frame(height: 36, alignment: .bottom)
+                    Text(day.label)
+                        .font(.caption2)
+                        .foregroundStyle(day.isToday ? .primary : .secondary)
+                }
+            }
+        }
+    }
 
     private var startHourBinding: Binding<Int> {
         Binding(
