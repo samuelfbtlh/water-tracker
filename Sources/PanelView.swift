@@ -148,11 +148,9 @@ struct PanelView: View {
             .controlSize(.regular)
             Spacer()
             if store.todayCount > 0 {
-                Button("−1") { withAnimation(.easeOut(duration: 0.2)) { store.add(-1) } }
-                    .buttonStyle(.borderless)
-                    .foregroundStyle(.secondary)
+                Button("−1 garrafa") { withAnimation(.easeOut(duration: 0.2)) { store.add(-1) } }
+                    .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
-                    .padding(.trailing, -6)
             }
         }
     }
