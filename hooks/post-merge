@@ -1,0 +1,2 @@
+#!/bin/bash
+"$(dirname "$0")/rebuild-if-needed" ORIG_HEAD || true

@@ -1,0 +1,15 @@
+#!/bin/bash
+# Rebuild local do Gota disparado pelos hooks post-commit/post-merge.
+# Uso: hooks/rebuild-if-needed <rev-base>. Nunca falha a operação do git.
+
+BASE="$1"
+[ "$(git symbolic-ref --short -q HEAD)" = "main" ] || exit 0
+git rev-parse -q --verify "$BASE" >/dev/null || exit 0
+git diff --quiet "$BASE" HEAD -- Sources Resources build.sh && exit 0
+
+# Log em .git/ (não em build/: o build.sh apaga build/ no início).
+LOG="$(git rev-parse --absolute-git-dir)/hook-build.log"
+ROOT="$(git rev-parse --show-toplevel)"
+echo "==> Rebuild em background ($BASE..HEAD), log: $LOG"
+nohup "$ROOT/build.sh" >"$LOG" 2>&1 </dev/null &
+exit 0

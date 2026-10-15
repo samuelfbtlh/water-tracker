@@ -74,6 +74,17 @@ final — a cópia instalada é a única fonte de verdade.
 Rebuildar após qualquer mudança em `Sources/` ou
 `Resources/Info.plist`: basta rodar `./build.sh` de novo.
 
+### Rebuild automático (opcional, local)
+
+```bash
+git config core.hooksPath hooks
+```
+
+Ativa os hooks de `hooks/`: após `commit` ou `merge`/`pull` em `main`
+que mude `Sources/`, `Resources/` ou `build.sh`, o `./build.sh` roda
+em background (não trava o git). Log em `.git/hook-build.log`. Para
+desativar: `git config --unset core.hooksPath`.
+
 ## Desinstalar
 
 ```bash
