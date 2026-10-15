@@ -2,13 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleIdentifier</key>
-	<string>com.vleineker.gota</string>
-	<key>CFBundleName</key>
-	<string>Gota</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>pt_BR</string>
 	<key>CFBundleDisplayName</key>
 	<string>Gota</string>
 	<key>CFBundleExecutable</key>
+	<string>Gota</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.vleineker.gota</string>
+	<key>CFBundleName</key>
 	<string>Gota</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
@@ -22,8 +26,6 @@
 	<true/>
 	<key>NSHighResolutionCapable</key>
 	<true/>
-	<key>CFBundleDevelopmentRegion</key>
-	<string>pt_BR</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Gota</string>
 </dict>

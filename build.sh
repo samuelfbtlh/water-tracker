@@ -22,6 +22,7 @@ swiftc -parse-as-library -swift-version 5 -O -whole-module-optimization \
 
 echo "==> Copiando Info.plist"
 cp Resources/Info.plist "$APP_DIR/Contents/Info.plist"
+cp Resources/AppIcon.icns "$APP_DIR/Contents/Resources/AppIcon.icns"
 plutil -lint "$APP_DIR/Contents/Info.plist"
 
 echo "==> Assinando (ad-hoc)"
