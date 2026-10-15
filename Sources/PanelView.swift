@@ -1,19 +1,22 @@
 import SwiftUI
+import AppKit
+
+/// Estado de UI só do painel (engrenagem de Ajustes). `@State` não compila nesta
+/// toolchain sem Xcode — espelha o padrão de `LoginItemUIState`.
+@MainActor
+@Observable
+final class PanelUIState {
+    static let shared = PanelUIState()
+    var settingsExpanded = false
+    private init() {}
+}
 
 struct PanelView: View {
     @Bindable var store = HydrationStore.shared
-    @Bindable var scheduler = ReminderScheduler.shared
-
     @Bindable private var loginState = LoginItemUIState.shared
+    @Bindable private var uiState = PanelUIState.shared
 
-    private static let dateFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.locale = Locale(identifier: "pt_BR")
-        f.setLocalizedDateFormatFromTemplate("d 'de' MMMM")
-        return f
-    }()
-
-    private var goalReached: Bool {
+    private var goalMet: Bool {
         store.todayCount >= store.settings.goalBottles
     }
 
@@ -22,132 +25,138 @@ struct PanelView: View {
         return min(1.0, Double(store.todayCount) / Double(store.settings.goalBottles))
     }
 
-    var body: some View {
-        VStack(spacing: 14) {
-            header
-            ring
-            buttons
-            reminderLine
-            weekStrip
-            settingsSection
-            Divider()
-            HStack {
-                Spacer()
-                Button("Sair") {
-                    NSApp.terminate(nil)
-                }
-                .buttonStyle(.borderless)
-                .keyboardShortcut("q", modifiers: .command)
-            }
-        }
-        .padding(16)
-        .frame(width: 290)
-    }
-
-    private var header: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Gota")
-                    .font(.headline)
-                Text("Hoje, \(Self.dateFormatter.string(from: Date()))")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-    }
-
-    private var ring: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.secondary.opacity(0.2), lineWidth: 12)
-            Circle()
-                .trim(from: 0, to: progress)
-                .stroke(
-                    AngularGradient(colors: [.cyan, .blue], center: .center),
-                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
-                )
-                .rotationEffect(.degrees(-90))
-                .animation(.spring, value: progress)
-
-            if goalReached {
-                VStack(spacing: 4) {
-                    Image(systemName: "drop.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(.blue)
-                        .symbolEffect(.bounce, value: goalReached)
-                    Text("Meta atingida!")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                VStack(spacing: 2) {
-                    Text("\(store.todayCount)/\(store.settings.goalBottles)")
-                        .font(.system(.title, design: .rounded, weight: .bold))
-                        .contentTransition(.numericText())
-                    Text(volumeCaption)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .frame(width: 120, height: 120)
-    }
-
-    private var volumeCaption: String {
+    private var litersLabel: String {
         let drankL = Double(store.todayCount * store.settings.bottleML) / 1000.0
         let goalL = Double(store.settings.goalBottles * store.settings.bottleML) / 1000.0
         return String(format: "%.1f L de %.1f L", drankL, goalL).replacingOccurrences(of: ".", with: ",")
     }
 
-    private var reminderLine: some View {
-        Group {
+    private var streakLabel: String {
+        switch store.streak {
+        case 0: return "0 dias"
+        case 1: return "1 dia"
+        default: return "\(store.streak) dias"
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            header
+            progressBar
+            litersAndStreak
+            actions
+            Divider()
+            if uiState.settingsExpanded {
+                settings
+                Divider()
+            }
+            footer
+        }
+        .padding(.top, 12)
+        .padding(.horizontal, 14)
+        .padding(.bottom, 6)
+        .frame(width: 250)
+        .onDisappear { uiState.settingsExpanded = false }
+    }
+
+    // MARK: - [1] Header
+
+    private var header: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("Gota").font(.headline).foregroundStyle(.primary)
             if NotificationManager.shared.authorizationDenied {
-                Button {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
-                        NSWorkspace.shared.open(url)
-                    }
-                } label: {
-                    Label("Notificações desativadas", systemImage: "bell.slash")
-                }
-                .buttonStyle(.plain)
-            } else if goalReached {
-                Label("Meta atingida, sem lembretes hoje", systemImage: "bell")
-            } else if let next = scheduler.nextReminderAt {
-                Label("Próximo lembrete às \(Self.timeFormatter.string(from: next))", systemImage: "bell")
-            } else {
-                Label("Lembretes a partir das \(String(format: "%02d:00", store.settings.startHour))", systemImage: "bell")
+                Image(systemName: "bell.slash")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .help("Lembretes desativados")
             }
-        }
-        .font(.callout)
-        .foregroundStyle(.secondary)
-    }
-
-    private static let timeFormatter: DateFormatter = {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm"
-        return f
-    }()
-
-    private var weekStrip: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            ForEach(Array(store.last7Days().enumerated()), id: \.offset) { _, day in
-                let goal = max(1, store.settings.goalBottles)
-                let ratio = min(1.0, Double(day.count) / Double(goal))
-                let height = max(4, 36 * ratio)
-                let goalHit = day.count >= store.settings.goalBottles
-                VStack(spacing: 4) {
-                    Capsule()
-                        .fill(Color.blue.opacity(goalHit ? 1.0 : 0.45))
-                        .frame(width: 18, height: height)
-                        .frame(height: 36, alignment: .bottom)
-                    Text(day.label)
-                        .font(.caption2)
-                        .foregroundStyle(day.isToday ? .primary : .secondary)
+            Spacer()
+            HStack(spacing: 5) {
+                if goalMet {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.body)
+                        .foregroundStyle(Color.accentColor)
                 }
+                countText
             }
         }
     }
+
+    private var countText: some View {
+        (Text("\(store.todayCount)").fontWeight(.semibold).foregroundStyle(.primary)
+         + Text(" de \(store.settings.goalBottles) garrafas").foregroundStyle(.secondary))
+            .font(.body)
+    }
+
+    // MARK: - [2] Barra de progresso
+
+    private var progressBar: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(.quaternary)
+                Capsule().fill(Color.accentColor)
+                    .frame(width: geo.size.width * progress)
+            }
+        }
+        .frame(height: 4)
+        .animation(.easeOut(duration: 0.2), value: store.todayCount)
+    }
+
+    // MARK: - [3] Litros · Streak
+
+    private var litersAndStreak: some View {
+        HStack(spacing: 6) {
+            Text(litersLabel).font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            HStack(spacing: 3) {
+                ForEach(store.last7StreakDays()) { day in
+                    streakDot(day)
+                }
+            }
+            Text(streakLabel).font(.caption).foregroundStyle(.secondary)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(store.streak) dias seguidos com meta batida")
+        .animation(.easeOut(duration: 0.2), value: store.todayCount)
+    }
+
+    @ViewBuilder
+    private func streakDot(_ day: StreakDay) -> some View {
+        if day.met {
+            Circle().fill(Color.accentColor).frame(width: 5, height: 5)
+        } else if day.isToday {
+            Circle().strokeBorder(Color.accentColor, lineWidth: 1).frame(width: 5, height: 5)
+        } else {
+            Circle().fill(.quaternary).frame(width: 5, height: 5)
+        }
+    }
+
+    // MARK: - [4] Ações
+
+    private var actions: some View {
+        HStack {
+            Group {
+                if goalMet {
+                    Button("+1 garrafa") { withAnimation(.easeOut(duration: 0.2)) { store.add(1) } }
+                        .buttonStyle(.bordered)
+                } else {
+                    Button("+1 garrafa") { withAnimation(.easeOut(duration: 0.2)) { store.add(1) } }
+                        .buttonStyle(.borderedProminent)
+                }
+            }
+            .controlSize(.regular)
+            Spacer()
+            if store.todayCount > 0 {
+                Button("−1") { withAnimation(.easeOut(duration: 0.2)) { store.add(-1) } }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
+                    .controlSize(.regular)
+                    .padding(.trailing, -6)
+            }
+        }
+    }
+
+    // MARK: - [6] Ajustes (expandido)
 
     private var startHourBinding: Binding<Int> {
         Binding(
@@ -178,73 +187,108 @@ struct PanelView: View {
         )
     }
 
-    private var settingsSection: some View {
-        DisclosureGroup("Ajustes") {
-            VStack(alignment: .leading, spacing: 10) {
-                Stepper(
-                    "Garrafa: \(store.settings.bottleML) ml",
-                    value: store.binding(\.bottleML), in: 100...3000, step: 50
-                )
-                Stepper(
-                    "Meta: \(store.settings.goalBottles) garrafas",
-                    value: store.binding(\.goalBottles), in: 1...20
-                )
-                Stepper(
-                    "Lembrar a cada \(store.settings.intervalMin) min",
-                    value: store.binding(\.intervalMin), in: 15...240, step: 15
-                )
-                Stepper(
-                    "Início: \(String(format: "%02d:00", store.settings.startHour))",
-                    value: startHourBinding, in: 0...23
-                )
-                Stepper(
-                    "Fim: \(String(format: "%02d:00", store.settings.endHour))",
-                    value: endHourBinding, in: 0...23
-                )
-                Toggle("Abrir ao iniciar sessão", isOn: loginToggleBinding)
-                if loginState.needsApproval {
-                    Button("Aprovar nos Ajustes") {
-                        LoginItemManager.openSettings()
-                    }
-                    .buttonStyle(.link)
-                }
-                if let error = loginState.errorMessage {
-                    Text(error)
-                        .font(.caption2)
-                        .foregroundStyle(.red)
-                }
-                Toggle("Mostrar contagem na barra", isOn: store.binding(\.showCountInBar))
-                Button("Testar lembrete") {
-                    NotificationManager.shared.postReminder()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+    private var settings: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Ajustes")
+                .font(.caption)
+                .fontWeight(.semibold)
+                .textCase(.uppercase)
+                .foregroundStyle(.secondary)
+
+            settingsRow("Garrafa", value: "\(store.settings.bottleML) ml") {
+                Stepper("", value: store.binding(\.bottleML), in: 100...3000, step: 50)
+                    .labelsHidden()
+                    .controlSize(.small)
             }
-            .padding(.top, 6)
+            settingsRow("Meta", value: "\(store.settings.goalBottles) garrafas") {
+                Stepper("", value: store.binding(\.goalBottles), in: 1...20)
+                    .labelsHidden()
+                    .controlSize(.small)
+            }
+            settingsRow("Intervalo", value: "\(store.settings.intervalMin) min") {
+                Stepper("", value: store.binding(\.intervalMin), in: 15...240, step: 15)
+                    .labelsHidden()
+                    .controlSize(.small)
+            }
+            settingsRow("Início", value: String(format: "%02d:00", store.settings.startHour)) {
+                Stepper("", value: startHourBinding, in: 0...23)
+                    .labelsHidden()
+                    .controlSize(.small)
+            }
+            settingsRow("Fim", value: String(format: "%02d:00", store.settings.endHour)) {
+                Stepper("", value: endHourBinding, in: 0...23)
+                    .labelsHidden()
+                    .controlSize(.small)
+            }
+
+            Toggle("Abrir ao iniciar sessão", isOn: loginToggleBinding)
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .frame(height: 20)
+            if loginState.needsApproval {
+                Button("Aprovar nos Ajustes") {
+                    LoginItemManager.openSettings()
+                }
+                .buttonStyle(.link)
+            }
+            if let error = loginState.errorMessage {
+                Text(error)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+            }
+            Toggle("Mostrar contagem na barra", isOn: store.binding(\.showCountInBar))
+                .toggleStyle(.switch)
+                .controlSize(.small)
+                .frame(height: 20)
+
+            Spacer().frame(height: 2)
+
+            Button("Testar lembrete") {
+                NotificationManager.shared.postReminder()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
         }
     }
 
-    private var buttons: some View {
-        VStack(spacing: 8) {
-            Button {
-                withAnimation { store.add(1) }
-            } label: {
-                Text("+1 garrafa")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .tint(.blue)
+    private func settingsRow<Content: View>(
+        _ label: String, value: String, @ViewBuilder stepper: () -> Content
+    ) -> some View {
+        HStack(spacing: 8) {
+            Text(label).font(.body).foregroundStyle(.primary)
+            Spacer()
+            Text(value).font(.body).foregroundStyle(.secondary)
+            stepper()
+        }
+        .frame(height: 20)
+    }
 
+    // MARK: - [6] Rodapé
+
+    private var footer: some View {
+        HStack {
             Button {
-                withAnimation { store.add(-1) }
+                withAnimation(.easeInOut(duration: 0.2)) { uiState.settingsExpanded.toggle() }
             } label: {
-                Text("−1")
-                    .frame(maxWidth: .infinity)
+                Image(systemName: "gearshape")
+                    .imageScale(.medium)
+                    .frame(width: 20, height: 20)
+                    .foregroundStyle(uiState.settingsExpanded ? .primary : .secondary)
+                    .background(
+                        uiState.settingsExpanded ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear),
+                        in: RoundedRectangle(cornerRadius: 5)
+                    )
             }
-            .buttonStyle(.bordered)
-            .controlSize(.large)
-            .disabled(store.todayCount <= 0)
+            .buttonStyle(.borderless)
+            .padding(.leading, -4)
+            Spacer()
+            Button("Sair") {
+                NSApp.terminate(nil)
+            }
+            .buttonStyle(.borderless)
+            .foregroundStyle(.secondary)
+            .keyboardShortcut("q")
+            .padding(.trailing, -6)
         }
     }
 }

@@ -15,6 +15,33 @@ struct Settings: Codable, Equatable {
 private struct Persisted: Codable {
     var settings: Settings = Settings()
     var history: [String: Int] = [:]
+    var metGoal: [String: Bool] = [:]
+
+    init() {}
+
+    init(settings: Settings, history: [String: Int], metGoal: [String: Bool]) {
+        self.settings = settings
+        self.history = history
+        self.metGoal = metGoal
+    }
+
+    private enum CodingKeys: String, CodingKey { case settings, history, metGoal }
+
+    // Decode manual: dado persistido da v1 não tem `metGoal` — sem isto, o decode
+    // falha inteiro e reseta settings/history também.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        settings = try container.decodeIfPresent(Settings.self, forKey: .settings) ?? Settings()
+        history = try container.decodeIfPresent([String: Int].self, forKey: .history) ?? [:]
+        metGoal = try container.decodeIfPresent([String: Bool].self, forKey: .metGoal) ?? [:]
+    }
+}
+
+/// Um dia na faixa de streak (D-6 … hoje) — ver regra do streak no handoff de design.
+struct StreakDay: Identifiable {
+    let id: String
+    let met: Bool
+    let isToday: Bool
 }
 
 @MainActor
@@ -32,12 +59,14 @@ final class HydrationStore {
 
     private(set) var settings: Settings
     private(set) var history: [String: Int]
+    private(set) var metGoal: [String: Bool]
     private(set) var todayKey: String
 
     private init() {
         let loaded = HydrationStore.load()
         self.settings = loaded.settings
         self.history = loaded.history
+        self.metGoal = loaded.metGoal
         self.todayKey = HydrationStore.dayFormatter.string(from: Date())
 
         NotificationCenter.default.addObserver(
@@ -68,6 +97,9 @@ final class HydrationStore {
         let current = history[todayKey] ?? 0
         let updated = max(0, current + delta)
         history[todayKey] = updated
+        // Vale o último valor do dia, não "em algum momento" — um "−1" depois de
+        // bater a meta desfaz o dia batido (regra do streak, handoff seção 4).
+        metGoal[todayKey] = updated >= settings.goalBottles
         trimHistory()
         persist()
         ReminderScheduler.shared.didLogDrink()
@@ -91,18 +123,33 @@ final class HydrationStore {
         )
     }
 
-    func last7Days() -> [(label: String, count: Int, isToday: Bool)] {
+    /// Últimos 7 dias (D-6 … hoje) para a faixa de pontos do streak.
+    func last7StreakDays() -> [StreakDay] {
         let calendar = Calendar.current
-        var result: [(label: String, count: Int, isToday: Bool)] = []
-        let weekdaySymbols = ["D", "S", "T", "Q", "Q", "S", "S"]
+        var result: [StreakDay] = []
         for offset in stride(from: 6, through: 0, by: -1) {
             guard let date = calendar.date(byAdding: .day, value: -offset, to: Date()) else { continue }
             let key = HydrationStore.dayFormatter.string(from: date)
-            let weekday = calendar.component(.weekday, from: date) - 1
-            let label = weekdaySymbols[weekday]
-            result.append((label: label, count: history[key] ?? 0, isToday: offset == 0))
+            result.append(StreakDay(id: key, met: metGoal[key] ?? false, isToday: offset == 0))
         }
         return result
+    }
+
+    /// Dias consecutivos terminando ontem ou hoje com meta batida (handoff seção 4).
+    var streak: Int {
+        let calendar = Calendar.current
+        var count = 0
+        if var cursor = calendar.date(byAdding: .day, value: -1, to: Date()) {
+            while metGoal[HydrationStore.dayFormatter.string(from: cursor)] == true {
+                count += 1
+                guard let prev = calendar.date(byAdding: .day, value: -1, to: cursor) else { break }
+                cursor = prev
+            }
+        }
+        if metGoal[todayKey] == true {
+            count += 1
+        }
+        return count
     }
 
     private func trimHistory() {
@@ -111,11 +158,12 @@ final class HydrationStore {
         let excess = sortedKeys.count - 30
         for key in sortedKeys.prefix(excess) {
             history.removeValue(forKey: key)
+            metGoal.removeValue(forKey: key)
         }
     }
 
     private func persist() {
-        let data = Persisted(settings: settings, history: history)
+        let data = Persisted(settings: settings, history: history, metGoal: metGoal)
         guard let encoded = try? JSONEncoder().encode(data) else { return }
         UserDefaults.standard.set(encoded, forKey: HydrationStore.defaultsKey)
     }
