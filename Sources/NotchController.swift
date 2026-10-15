@@ -72,7 +72,8 @@ final class NotchController {
     static let heightAnimation: Animation = .easeInOut(duration: 0.2)
     /// Quanto o mouse precisa ficar sobre o indicador para o painel abrir.
     private static let openDelay: Duration = .milliseconds(666)
-    /// Depois de fechado, quanto esperar para recolher os Ajustes sem aparecer na animação.
+    /// Depois de fechado, quanto esperar para restaurar o painel (Ajustes recolhidos, sem
+    /// confirmação de remoção) sem aparecer na animação.
     private static let resetDelay: Duration = .milliseconds(350)
 
     static func collapsedWidth(for notch: NotchGeometry, showCount: Bool) -> CGFloat {
@@ -146,7 +147,10 @@ final class NotchController {
     private func expand() {
         guard !expanded else { return }
         resetTask?.cancel()
+        // O `PanelView` fica sempre montado no notch, então o `onAppear` dele não roda a cada
+        // abertura: o que ele faria ao aparecer é repetido aqui.
         NotificationManager.shared.refreshStatus()
+        UpdateChecker.shared.checkIfDue()
         expanded = true
     }
 
@@ -158,8 +162,14 @@ final class NotchController {
         resetTask = Task { @MainActor in
             try? await Task.sleep(for: Self.resetDelay)
             guard !Task.isCancelled else { return }
-            PanelUIState.shared.settingsExpanded = false
+            Self.resetPanelState()
         }
+    }
+
+    /// Equivalente ao `onDisappear` do `PanelView`, que no notch nunca dispara.
+    private static func resetPanelState() {
+        PanelUIState.shared.settingsExpanded = false
+        PanelUIState.shared.confirmingRemove = false
     }
 
     func panelHeightChanged(_ height: CGFloat) {
@@ -181,7 +191,7 @@ final class NotchController {
         resetTask?.cancel()
         removeClickMonitor()
         expanded = false
-        PanelUIState.shared.settingsExpanded = false
+        Self.resetPanelState()
         panel?.orderOut(nil)
     }
 
