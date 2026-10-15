@@ -22,6 +22,7 @@ struct PanelView: View {
     @Bindable var store = HydrationStore.shared
     @Bindable private var loginState = LoginItemUIState.shared
     @Bindable private var uiState = PanelUIState.shared
+    @Bindable private var updater = UpdateChecker.shared
 
     private var goalMet: Bool {
         store.todayCount >= store.settings.goalBottles
@@ -57,6 +58,9 @@ struct PanelView: View {
                 settings
                 Divider()
             }
+            if let release = updater.available {
+                updateRow(release)
+            }
             footer
         }
         .padding(.top, 12)
@@ -64,7 +68,10 @@ struct PanelView: View {
         .padding(.bottom, 6)
         .frame(width: 250)
         .tint(.gotaAccent)
-        .onAppear { NotificationManager.shared.refreshStatus() }
+        .onAppear {
+            NotificationManager.shared.refreshStatus()
+            updater.checkIfDue()
+        }
         .onDisappear {
             uiState.settingsExpanded = false
             uiState.confirmingRemove = false
@@ -298,6 +305,21 @@ struct PanelView: View {
             stepper()
         }
         .frame(height: 20)
+    }
+
+    // MARK: - Nova versão (só quando a release do GitHub é mais nova)
+
+    private func updateRow(_ release: UpdateChecker.Release) -> some View {
+        Button {
+            NSWorkspace.shared.open(release.url)
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "arrow.down.circle").foregroundStyle(Color.gotaAccent)
+                Text("Nova versão \(release.version) disponível").foregroundStyle(.secondary)
+            }
+            .font(.caption)
+        }
+        .buttonStyle(.borderless)
     }
 
     // MARK: - [6] Rodapé

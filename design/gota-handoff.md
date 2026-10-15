@@ -16,7 +16,7 @@ Referências visuais em `states/` (PNG @2x, 1:1 = 250 pt de largura) e `icon/`.
 | Padding externo | top 12 · leading/trailing 14 · bottom 6 |
 | Spacing vertical entre seções | 8 (VStack raiz: `VStack(alignment: .leading, spacing: 8)`) |
 | Fonte | SF Pro via text styles do sistema (nunca `.system(size:)`) |
-| Cor de acento | `Color.gotaAccent` = `Color(nsColor: .systemBlue)`, aplicado também como `.tint(.gotaAccent)` na raiz do painel — único azul do painel. Fixado em systemBlue (não `Color.gotaAccent`) porque com o acento "Grafite" do macOS o "+1 garrafa" e a barra ficavam cinzas. Aparece em exatamente 3 lugares: fill da barra, pontos de streak com meta batida, botão `.borderedProminent` |
+| Cor de acento | `Color.gotaAccent` = `Color(nsColor: .systemBlue)`, aplicado também como `.tint(.gotaAccent)` na raiz do painel — único azul do painel. Fixado em systemBlue (não `Color.gotaAccent`) porque com o acento "Grafite" do macOS o "+1 garrafa" e a barra ficavam cinzas. Aparece em exatamente 3 lugares: fill da barra, pontos de streak com meta batida, botão `.borderedProminent` (mais o ícone da linha condicional "Nova versão", [5b]) |
 | Demais cores | `.primary`, `.secondary`, `.quaternary` (fills), `Divider()` padrão |
 | Ícones | SF Symbols, sempre `.imageScale(.small)` ou `font(.caption)` conforme tabela |
 | Animação | `withAnimation(.easeOut(duration: 0.2))` ao mudar a barra e os pontos; `.animation(.easeInOut(duration: 0.2))` ao expandir Ajustes. Nada mais anima. |
@@ -83,6 +83,14 @@ Ambos mantêm as ações já existentes. Altura resultante 22 pt (regular). O "�
 
 ### [5] `Divider()`
 
+### [5b] Nova versão (condicional)
+
+Só aparece quando a release mais recente no GitHub (`releases/latest`, `tag_name` sem o "v") é numericamente maior que `CFBundleShortVersionString`. Checagem ao abrir o painel, no máximo 1x a cada 24 h; silenciosa em erro/offline (linha simplesmente não aparece). Fica logo acima do rodapé (abaixo de Ajustes, quando expandido).
+
+| Elemento | Componente | Tipografia | Cor | Observações |
+|---|---|---|---|---|
+| `arrow.down.circle` + "Nova versão 1.1 disponível" | `Button` `.buttonStyle(.borderless)` com `HStack(spacing: 4)` | `.caption` | ícone `Color.gotaAccent`, texto `.secondary` | Clique abre `html_url` da release via `NSWorkspace.shared.open`. Sem fundo, sem cor de alerta. |
+
 ### [6] Rodapé — `HStack`
 | Elemento | Componente | Estilo | Cor | Observações |
 |---|---|---|---|---|
@@ -116,7 +124,7 @@ Para alinhar com as bordas do texto acima: engrenagem com `.padding(.leading, -4
 | "Gota", número da contagem, labels de Ajustes, ícone da engrenagem quando ativo | `.primary` |
 | "de 4 garrafas", litros, "N dias", "−1", "Sair", engrenagem, `bell.slash`, valores dos steppers | `.secondary` |
 | Trilho da barra, pontos sem meta, fundo da engrenagem ativa | `.quaternary` |
-| Fill da barra, pontos com meta, anel de "hoje", botão prominente, `checkmark.circle.fill`, toggles ligados | `Color.gotaAccent` |
+| Fill da barra, pontos com meta, anel de "hoje", botão prominente, `checkmark.circle.fill`, toggles ligados, ícone de "Nova versão" | `Color.gotaAccent` |
 | Separadores | `Divider()` padrão |
 
 Nenhuma cor "de sucesso" (verde) na meta batida: continua accent. Nenhuma cor de alerta.
