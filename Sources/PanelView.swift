@@ -25,6 +25,12 @@ struct PanelView: View {
             header
             ring
             buttons
+            reminderLine
+            Button("Testar lembrete") {
+                NotificationManager.shared.postReminder()
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
             Divider()
             HStack {
                 Spacer()
@@ -94,6 +100,35 @@ struct PanelView: View {
         let goalL = Double(store.settings.goalBottles * store.settings.bottleML) / 1000.0
         return String(format: "%.1f L de %.1f L", drankL, goalL).replacingOccurrences(of: ".", with: ",")
     }
+
+    private var reminderLine: some View {
+        Group {
+            if NotificationManager.shared.authorizationDenied {
+                Button {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.notifications") {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    Label("Notificações desativadas", systemImage: "bell.slash")
+                }
+                .buttonStyle(.plain)
+            } else if goalReached {
+                Label("Meta atingida, sem lembretes hoje", systemImage: "bell")
+            } else if let next = scheduler.nextReminderAt {
+                Label("Próximo lembrete às \(Self.timeFormatter.string(from: next))", systemImage: "bell")
+            } else {
+                Label("Lembretes a partir das \(String(format: "%02d:00", store.settings.startHour))", systemImage: "bell")
+            }
+        }
+        .font(.callout)
+        .foregroundStyle(.secondary)
+    }
+
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
 
     private var buttons: some View {
         VStack(spacing: 8) {

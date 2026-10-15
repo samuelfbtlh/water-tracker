@@ -43,6 +43,7 @@ struct GotaApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Etapas seguintes vão configurar NotificationManager e ReminderScheduler aqui.
+        NotificationManager.shared.configure()
+        ReminderScheduler.shared.start()
     }
 }
