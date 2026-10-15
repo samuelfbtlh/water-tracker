@@ -14,11 +14,34 @@ echo "==> Limpando build anterior"
 rm -rf "$BUILD_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 
-echo "==> Compilando"
-swiftc -parse-as-library -swift-version 5 -O -whole-module-optimization \
-  -target arm64-apple-macosx14.0 -sdk "$SDK_PATH" \
-  -framework SwiftUI -framework AppKit -framework UserNotifications -framework ServiceManagement \
-  Sources/*.swift -o "$APP_DIR/Contents/MacOS/$APP_NAME"
+compile_arch() {
+  local target="$1"
+  local output="$2"
+  swiftc -parse-as-library -swift-version 5 -O -whole-module-optimization \
+    -target "$target" -sdk "$SDK_PATH" \
+    -framework SwiftUI -framework AppKit -framework UserNotifications -framework ServiceManagement \
+    Sources/*.swift -o "$output"
+}
+
+echo "==> Compilando (arm64)"
+compile_arch "arm64-apple-macosx14.0" "$BUILD_DIR/$APP_NAME-arm64"
+
+X86_OK=1
+echo "==> Compilando (x86_64)"
+if ! compile_arch "x86_64-apple-macosx14.0" "$BUILD_DIR/$APP_NAME-x86_64" \
+  2>"$BUILD_DIR/x86_64-error.log"; then
+  X86_OK=0
+  echo "==> AVISO: build x86_64 falhou, binario sera so arm64:" >&2
+  cat "$BUILD_DIR/x86_64-error.log" >&2
+fi
+
+echo "==> Gerando binario (universal se x86_64 compilou)"
+if [ "$X86_OK" -eq 1 ]; then
+  lipo -create -output "$APP_DIR/Contents/MacOS/$APP_NAME" \
+    "$BUILD_DIR/$APP_NAME-arm64" "$BUILD_DIR/$APP_NAME-x86_64"
+else
+  cp "$BUILD_DIR/$APP_NAME-arm64" "$APP_DIR/Contents/MacOS/$APP_NAME"
+fi
 
 echo "==> Copiando Info.plist"
 cp Resources/Info.plist "$APP_DIR/Contents/Info.plist"
