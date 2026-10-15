@@ -75,9 +75,11 @@ O grupo pontos + texto tem `.accessibilityElement(children: .combine)` e label "
 |---|---|---|---|---|
 | "+1 garrafa" | `Button` | `.buttonStyle(.borderedProminent)`, `.controlSize(.regular)` — **não** `.large`, **não** full-width | sistema (`.body`, medium) | tint = accent (padrão) |
 | `Spacer()` | | | | |
-| "−1 garrafa" | `Button` | `.buttonStyle(.borderedProminent)`, `.controlSize(.regular)` | sistema (`.body`, medium) | tint = accent (padrão) |
+| "−1 garrafa" | `Button` | `.buttonStyle(.bordered)`, `.tint(.red)`, `.controlSize(.regular)` | `.body` | fundo vermelho de baixa opacidade (tint do `.bordered`) |
 
 Ambos mantêm as ações já existentes. Altura resultante 22 pt (regular). O "−1 garrafa" fica oculto quando `count == 0` (ver estado 1) — ocultar, não desabilitar, para não sobrar um botão cinza.
+
+**Confirmação de remoção:** tocar em "−1 garrafa" não remove; troca a linha de ações por "Deseja realmente remover uma garrafa?" (`.caption`, `.secondary`) com "Cancelar" (`.bordered`, atalho Esc) e "Remover" (`.borderedProminent`, `.tint(.red)`). Só "Remover" chama `store.add(-1)`. Confirmação inline (não `.alert`/`.confirmationDialog`) porque diálogos de sistema tiram o foco e fecham o popover da barra de menus. Fechar o painel cancela (`confirmingRemove = false` em `onDisappear`).
 
 ### [5] `Divider()`
 
@@ -117,7 +119,7 @@ Para alinhar com as bordas do texto acima: engrenagem com `.padding(.leading, -4
 | Fill da barra, pontos com meta, anel de "hoje", botões prominentes, `checkmark.circle.fill`, toggles ligados | `Color.accentColor` |
 | Separadores | `Divider()` padrão |
 
-Nenhuma cor "de sucesso" (verde) na meta batida: continua accent. Nenhuma cor de alerta.
+Nenhuma cor "de sucesso" (verde) na meta batida: continua accent. Única exceção: "−1 garrafa" (ação destrutiva) usa vermelho de baixa opacidade.
 
 ---
 
@@ -151,7 +153,7 @@ Isto substitui integralmente a faixa de 7 barras.
 |---|---|---|
 | 1 | **0 garrafas** | Contagem "**0** de 4 garrafas"; barra com fill de largura 0; litros "0,0 L de 2,0 L"; botão "−1 garrafa" **oculto** (`if count > 0`). Ponto de hoje = anel. |
 | 2 | **Parcial** (base) | Como descrito na seção 1. |
-| 3 | **Meta batida** (`count >= goal`) | `checkmark.circle.fill` em accent (`.body`) 5 pt antes da contagem; barra 100 %; ponto de hoje preenchido; `streak` já inclui hoje; "+1 garrafa" troca para `.buttonStyle(.bordered)` (mesma ação, mesmo texto — só perde o destaque). "−1 garrafa" continua visível e prominent (azul). Se `count > goal`, barra fica em 100 % e a contagem mostra o número real ("5 de 4 garrafas"). |
+| 3 | **Meta batida** (`count >= goal`) | `checkmark.circle.fill` em accent (`.body`) 5 pt antes da contagem; barra 100 %; ponto de hoje preenchido; `streak` já inclui hoje; "+1 garrafa" troca para `.buttonStyle(.bordered)` (mesma ação, mesmo texto — só perde o destaque). "−1 garrafa" continua visível (`.bordered` vermelho). Se `count > goal`, barra fica em 100 % e a contagem mostra o número real ("5 de 4 garrafas"). |
 | 4 | **Notificações desativadas** (toggle "Lembretes" off ou permissão negada) | `Image(systemName: "bell.slash")` `.caption` `.secondary` a 6 pt da direita de "Gota", com `.help("Lembretes desativados")`. Nada mais muda. |
 | 5 | **Ajustes expandido** (`settingsExpanded == true`) | Entre o `Divider` [5] e o rodapé entra a seção de Ajustes (abaixo), seguida de outro `Divider()` e spacing 8. Engrenagem com fundo `.quaternary` e ícone `.primary`. Altura total 374 pt. Fecha ao clicar de novo na engrenagem; fechar o painel também colapsa (`settingsExpanded = false` em `onDisappear`). |
 | — | **Modo claro** | Nada a fazer: todas as cores são semânticas. |
@@ -285,8 +287,8 @@ struct PanelView: View {
             .controlSize(.regular)
             Spacer()
             if model.count > 0 {
-                Button("−1 garrafa", action: model.remove)
-                    .buttonStyle(.borderedProminent)
+                Button("−1 garrafa") { model.confirmingRemove = true }
+                    .buttonStyle(.bordered).tint(.red)
             }
         }
     }

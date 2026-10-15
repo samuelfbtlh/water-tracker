@@ -8,6 +8,7 @@ import AppKit
 final class PanelUIState {
     static let shared = PanelUIState()
     var settingsExpanded = false
+    var confirmingRemove = false
     private init() {}
 }
 
@@ -57,7 +58,10 @@ struct PanelView: View {
         .padding(.bottom, 6)
         .frame(width: 250)
         .onAppear { NotificationManager.shared.refreshStatus() }
-        .onDisappear { uiState.settingsExpanded = false }
+        .onDisappear {
+            uiState.settingsExpanded = false
+            uiState.confirmingRemove = false
+        }
     }
 
     // MARK: - [1] Header
@@ -134,24 +138,51 @@ struct PanelView: View {
 
     // MARK: - [4] Ações
 
+    @ViewBuilder
     private var actions: some View {
-        HStack {
-            Group {
-                if goalMet {
-                    Button("+1 garrafa") { withAnimation(.easeOut(duration: 0.2)) { store.add(1) } }
+        if uiState.confirmingRemove {
+            removeConfirmation
+        } else {
+            HStack {
+                Group {
+                    if goalMet {
+                        Button("+1 garrafa") { withAnimation(.easeOut(duration: 0.2)) { store.add(1) } }
+                            .buttonStyle(.bordered)
+                    } else {
+                        Button("+1 garrafa") { withAnimation(.easeOut(duration: 0.2)) { store.add(1) } }
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+                .controlSize(.regular)
+                Spacer()
+                if store.todayCount > 0 {
+                    Button("−1 garrafa") { uiState.confirmingRemove = true }
                         .buttonStyle(.bordered)
-                } else {
-                    Button("+1 garrafa") { withAnimation(.easeOut(duration: 0.2)) { store.add(1) } }
-                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                        .controlSize(.regular)
                 }
             }
-            .controlSize(.regular)
-            Spacer()
-            if store.todayCount > 0 {
-                Button("−1 garrafa") { withAnimation(.easeOut(duration: 0.2)) { store.add(-1) } }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.regular)
+        }
+    }
+
+    private var removeConfirmation: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Deseja realmente remover uma garrafa?")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Button("Cancelar") { uiState.confirmingRemove = false }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Remover") {
+                    withAnimation(.easeOut(duration: 0.2)) { store.add(-1) }
+                    uiState.confirmingRemove = false
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
             }
+            .controlSize(.regular)
         }
     }
 
