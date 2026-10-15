@@ -156,10 +156,11 @@ struct PanelView: View {
                 .controlSize(.regular)
                 Spacer()
                 if store.todayCount > 0 {
-                    Button("−1 garrafa") { uiState.confirmingRemove = true }
-                        .buttonStyle(.bordered)
-                        .tint(.red)
+                    Button("−1") { uiState.confirmingRemove = true }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.secondary)
                         .controlSize(.regular)
+                        .padding(.trailing, -6)
                 }
             }
         }
@@ -179,8 +180,7 @@ struct PanelView: View {
                     withAnimation(.easeOut(duration: 0.2)) { store.add(-1) }
                     uiState.confirmingRemove = false
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.red)
+                .buttonStyle(.bordered)
             }
             .controlSize(.regular)
         }

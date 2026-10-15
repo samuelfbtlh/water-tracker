@@ -75,11 +75,11 @@ O grupo pontos + texto tem `.accessibilityElement(children: .combine)` e label "
 |---|---|---|---|---|
 | "+1 garrafa" | `Button` | `.buttonStyle(.borderedProminent)`, `.controlSize(.regular)` — **não** `.large`, **não** full-width | sistema (`.body`, medium) | tint = accent (padrão) |
 | `Spacer()` | | | | |
-| "−1 garrafa" | `Button` | `.buttonStyle(.bordered)`, `.tint(.red)`, `.controlSize(.regular)` | `.body` | fundo vermelho de baixa opacidade (tint do `.bordered`) |
+| "−1" | `Button` | `.buttonStyle(.borderless)`, `.controlSize(.regular)` | `.body` | `.foregroundStyle(.secondary)` |
 
-Ambos mantêm as ações já existentes. Altura resultante 22 pt (regular). O "−1 garrafa" fica oculto quando `count == 0` (ver estado 1) — ocultar, não desabilitar, para não sobrar um botão cinza.
+Ambos mantêm as ações já existentes. Altura resultante 22 pt (regular). O "−1" fica oculto quando `count == 0` (ver estado 1) — ocultar, não desabilitar, para não sobrar um botão cinza.
 
-**Confirmação de remoção:** tocar em "−1 garrafa" não remove; troca a linha de ações por "Deseja realmente remover uma garrafa?" (`.caption`, `.secondary`) com "Cancelar" (`.bordered`, atalho Esc) e "Remover" (`.borderedProminent`, `.tint(.red)`). Só "Remover" chama `store.add(-1)`. Confirmação inline (não `.alert`/`.confirmationDialog`) porque diálogos de sistema tiram o foco e fecham o popover da barra de menus. Fechar o painel cancela (`confirmingRemove = false` em `onDisappear`).
+**Confirmação de remoção:** tocar em "−1" não remove; troca a linha de ações por "Deseja realmente remover uma garrafa?" (`.caption`, `.secondary`) com "Cancelar" (`.bordered`, atalho Esc) e "Remover" (`.bordered`, sem tint — sem cor de alerta). Só "Remover" chama `store.add(-1)`. Confirmação inline (não `.alert`/`.confirmationDialog`) porque diálogos de sistema tiram o foco e fecham o popover da barra de menus. Fechar o painel cancela (`confirmingRemove = false` em `onDisappear`).
 
 ### [5] `Divider()`
 
@@ -102,7 +102,7 @@ Para alinhar com as bordas do texto acima: engrenagem com `.padding(.leading, -4
 | Contagem — número | `.body` | `.semibold` |
 | Contagem — "de 4 garrafas" | `.body` | regular |
 | "1,0 L de 2,0 L", "3 dias" | `.caption` | regular |
-| Botões "+1 garrafa", "−1 garrafa", "Sair", "Testar lembrete" | padrão do `Button` (`.body`) | padrão |
+| Botões "+1 garrafa", "−1", "Sair", "Testar lembrete" | padrão do `Button` (`.body`) | padrão |
 | Cabeçalho "AJUSTES" | `.caption` | `.semibold`, `.textCase(.uppercase)` |
 | Labels dos steppers/toggles | `.body` | regular |
 | Valores dos steppers | `.body` | regular, `.secondary` |
@@ -114,12 +114,12 @@ Para alinhar com as bordas do texto acima: engrenagem com `.padding(.leading, -4
 | Elemento | Cor semântica |
 |---|---|
 | "Gota", número da contagem, labels de Ajustes, ícone da engrenagem quando ativo | `.primary` |
-| "de 4 garrafas", litros, "N dias", "Sair", engrenagem, `bell.slash`, valores dos steppers | `.secondary` |
+| "de 4 garrafas", litros, "N dias", "−1", "Sair", engrenagem, `bell.slash`, valores dos steppers | `.secondary` |
 | Trilho da barra, pontos sem meta, fundo da engrenagem ativa | `.quaternary` |
-| Fill da barra, pontos com meta, anel de "hoje", botões prominentes, `checkmark.circle.fill`, toggles ligados | `Color.accentColor` |
+| Fill da barra, pontos com meta, anel de "hoje", botão prominente, `checkmark.circle.fill`, toggles ligados | `Color.accentColor` |
 | Separadores | `Divider()` padrão |
 
-Nenhuma cor "de sucesso" (verde) na meta batida: continua accent. Única exceção: "−1 garrafa" (ação destrutiva) usa vermelho de baixa opacidade.
+Nenhuma cor "de sucesso" (verde) na meta batida: continua accent. Nenhuma cor de alerta.
 
 ---
 
@@ -127,7 +127,7 @@ Nenhuma cor "de sucesso" (verde) na meta batida: continua accent. Única exceç�
 
 **Definição:** número de dias consecutivos, terminando **ontem ou hoje**, em que `count >= goal` ao final do dia.
 
-- **Dia batido:** vale o último valor registrado no dia, não "em algum momento". Implementação: a cada mudança de `count`, gravar `metGoal[today] = count >= goal` (um "−1 garrafa" depois de bater a meta desfaz o dia batido).
+- **Dia batido:** vale o último valor registrado no dia, não "em algum momento". Implementação: a cada mudança de `count`, gravar `metGoal[today] = count >= goal` (um "−1" depois de bater a meta desfaz o dia batido).
 - **Como conta:** ao abrir o painel, percorrer de ontem para trás enquanto `metGoal[d] == true`; esse total é `streak`. Se `metGoal[today] == true`, `streak += 1`.
 - **Quando zera:** quando existe um dia completo (ontem ou antes) sem meta. Hoje não zera o streak enquanto o dia não acabar — por isso o ponto de hoje é um anel, não um ponto vazio.
 - **Mudança de meta:** usa a meta vigente em cada dia (gravar `metGoal` já resolvido, não recalcular retroativamente).
@@ -151,9 +151,9 @@ Isto substitui integralmente a faixa de 7 barras.
 
 | # | Estado | O que muda em relação ao base (parcial) |
 |---|---|---|
-| 1 | **0 garrafas** | Contagem "**0** de 4 garrafas"; barra com fill de largura 0; litros "0,0 L de 2,0 L"; botão "−1 garrafa" **oculto** (`if count > 0`). Ponto de hoje = anel. |
+| 1 | **0 garrafas** | Contagem "**0** de 4 garrafas"; barra com fill de largura 0; litros "0,0 L de 2,0 L"; botão "−1" **oculto** (`if count > 0`). Ponto de hoje = anel. |
 | 2 | **Parcial** (base) | Como descrito na seção 1. |
-| 3 | **Meta batida** (`count >= goal`) | `checkmark.circle.fill` em accent (`.body`) 5 pt antes da contagem; barra 100 %; ponto de hoje preenchido; `streak` já inclui hoje; "+1 garrafa" troca para `.buttonStyle(.bordered)` (mesma ação, mesmo texto — só perde o destaque). "−1 garrafa" continua visível (`.bordered` vermelho). Se `count > goal`, barra fica em 100 % e a contagem mostra o número real ("5 de 4 garrafas"). |
+| 3 | **Meta batida** (`count >= goal`) | `checkmark.circle.fill` em accent (`.body`) 5 pt antes da contagem; barra 100 %; ponto de hoje preenchido; `streak` já inclui hoje; "+1 garrafa" troca para `.buttonStyle(.bordered)` (mesma ação, mesmo texto — só perde o destaque). "−1" continua visível. Se `count > goal`, barra fica em 100 % e a contagem mostra o número real ("5 de 4 garrafas"). |
 | 4 | **Notificações desativadas** (toggle "Lembretes" off ou permissão negada) | `Image(systemName: "bell.slash")` `.caption` `.secondary` a 6 pt da direita de "Gota", com `.help("Lembretes desativados")`. Nada mais muda. |
 | 5 | **Ajustes expandido** (`settingsExpanded == true`) | Entre o `Divider` [5] e o rodapé entra a seção de Ajustes (abaixo), seguida de outro `Divider()` e spacing 8. Engrenagem com fundo `.quaternary` e ícone `.primary`. Altura total 374 pt. Fecha ao clicar de novo na engrenagem; fechar o painel também colapsa (`settingsExpanded = false` em `onDisappear`). |
 | — | **Modo claro** | Nada a fazer: todas as cores são semânticas. |
@@ -287,8 +287,9 @@ struct PanelView: View {
             .controlSize(.regular)
             Spacer()
             if model.count > 0 {
-                Button("−1 garrafa") { model.confirmingRemove = true }
-                    .buttonStyle(.bordered).tint(.red)
+                Button("−1") { model.confirmingRemove = true }
+                    .buttonStyle(.borderless).foregroundStyle(.secondary)
+                    .padding(.trailing, -6)
             }
         }
     }
@@ -322,7 +323,7 @@ struct PanelView: View {
 - [ ] Nenhum `Color(hex:)`, `Color(red:green:blue:)` ou `.blue` no painel — só `Color.accentColor` e cores semânticas
 - [ ] Nenhum `.background` no container (o `MenuBarExtra` fornece o material)
 - [ ] Nenhum `.font(.system(size:))` — só text styles
-- [ ] "−1 garrafa" some em 0 garrafas; "+1 garrafa" vira `.bordered` ao bater a meta
+- [ ] "−1" some em 0 garrafas; "+1 garrafa" vira `.bordered` ao bater a meta
 - [ ] `bell.slash` aparece quando lembretes estão desativados
 - [ ] Streak conta conforme seção 4 e o ponto de hoje é anel até bater a meta
 - [ ] Alternar modo claro/escuro no sistema não exige nenhum código
