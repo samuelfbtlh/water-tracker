@@ -80,9 +80,11 @@ Não altere funcionalidades, textos de ação ("+1 garrafa", "Bebi uma garrafa",
 
 ## Quando voltar
 
-Traga o markdown do handoff e os PNGs para esta pasta
-(`~/projects/water-tracker/docs/`) e abra a demanda com Futaba: "implementa o
-handoff de design v2 do Gota". Junto entra o bug funcional já conhecido: o
-painel mostra "Notificações desativadas" mesmo com permissão concedida (status
-precisa ser relido via `getNotificationSettings` ao abrir o painel, não só no
-launch).
+Traga o markdown do handoff e os PNGs para esta pasta — o handoff final ficou
+em `~/projects/water-tracker/design/gota-handoff.md`, não em `docs/` — e abra a
+demanda com Futaba: "implementa o handoff de design v2 do Gota". O bug
+funcional já conhecido na época (o painel mostra "Notificações desativadas"
+mesmo com permissão concedida; status precisa ser relido via
+`getNotificationSettings` ao abrir o painel, não só no launch) foi corrigido no
+commit `2b724ec` ("fix: re-read notification authorization when panel
+opens").
