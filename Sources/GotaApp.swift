@@ -19,28 +19,57 @@ struct GotaApp: App {
     private var menuBarLabel: some View {
         let count = store.todayCount
         let goal = store.settings.goalBottles
-        let symbol = dropSymbol(count: count, goal: goal)
         if store.settings.showCountInBar {
             HStack(spacing: 4) {
-                Image(systemName: symbol)
+                dropImage(count: count, goal: goal)
                 Text("\(count)/\(goal)")
             }
         } else {
-            Image(systemName: symbol)
+            dropImage(count: count, goal: goal)
         }
     }
 
-    private func dropSymbol(count: Int, goal: Int) -> String {
+    @ViewBuilder
+    private func dropImage(count: Int, goal: Int) -> some View {
+        let name = dropAssetName(count: count, goal: goal)
+        if let nsImage = Self.menubarImage(named: name) {
+            Image(nsImage: nsImage)
+        } else {
+            Image(systemName: dropSymbolFallback(count: count, goal: goal))
+        }
+    }
+
+    private func dropAssetName(count: Int, goal: Int) -> String {
+        if goal > 0 && count >= goal {
+            return "drop-full"
+        }
+        if count > 0 {
+            return "drop-half"
+        }
+        return "drop-empty"
+    }
+
+    private func dropSymbolFallback(count: Int, goal: Int) -> String {
         if goal > 0 && count >= goal {
             return "drop.fill"
         }
-        if count > 0 {
-            let halfName = "drop.halffull"
-            if NSImage(systemSymbolName: halfName, accessibilityDescription: nil) != nil {
-                return halfName
-            }
-        }
         return "drop"
+    }
+
+    private static var menubarImageCache: [String: NSImage] = [:]
+
+    private static func menubarImage(named name: String) -> NSImage? {
+        if let cached = menubarImageCache[name] {
+            return cached
+        }
+        guard let url = Bundle.main.url(forResource: name, withExtension: "svg", subdirectory: "menubar"),
+              let image = NSImage(contentsOf: url) else {
+            return nil
+        }
+        image.isTemplate = true
+        image.size = NSSize(width: 18, height: 18)
+        menubarImageCache[name] = image
+        return image
     }
 }
 
