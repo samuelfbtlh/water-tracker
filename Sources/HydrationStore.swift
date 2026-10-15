@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import AppKit
 
 struct Settings: Codable, Equatable {
     var bottleML: Int = 500
@@ -37,6 +38,17 @@ final class HydrationStore {
         self.settings = loaded.settings
         self.history = loaded.history
         self.todayKey = HydrationStore.dayFormatter.string(from: Date())
+
+        NotificationCenter.default.addObserver(
+            forName: .NSCalendarDayChanged, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refreshDay() }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refreshDay() }
+        }
     }
 
     var todayCount: Int {
