@@ -173,10 +173,24 @@ Isto substitui integralmente a faixa de 7 barras.
 | "AJUSTES" | `Text` `.caption` `.semibold` `.textCase(.uppercase)` `.secondary` | 13 | |
 | 5 steppers (manter os existentes, mesma ordem e rótulos) | `HStack { Text(label); Spacer(); Text(valor).foregroundStyle(.secondary); Stepper("", value:…).labelsHidden() }` | 20 cada | gap 8 entre valor e `Stepper`; `.controlSize(.small)` no `Stepper` |
 | 2 toggles (os existentes) | `Toggle(label, isOn:)` `.toggleStyle(.switch)` `.controlSize(.small)` | 20 cada | label `.body` `.primary` |
+| Toggle "Mostrar no notch" | idêntico aos toggles acima | 20 | só aparece se `NotchController.shared.hasNotch`; ver seção 5.1 |
 | espaçador | `Spacer().frame(height: 2)` | 2 | |
 | "Testar lembrete" | `Button` `.buttonStyle(.bordered)` `.controlSize(.regular)` | 22 | alinhado à esquerda, largura natural |
 
 Isto substitui o `DisclosureGroup("Ajustes")`. Se preferir manter o `DisclosureGroup`, use-o com `.disclosureGroupStyle` padrão, label "Ajustes" `.body`, no lugar da engrenagem — o conteúdo interno é o mesmo. A versão com engrenagem é a desenhada.
+
+### 5.1 Indicador no notch (Macs com notch)
+
+Com `Settings.useNotch == true` (padrão) e uma tela com `safeAreaInsets.top > 0`, o ícone da barra de menus é removido (`MenuBarExtra(isInserted:)`) e o `NotchController` mostra um `NSPanel` sem borda sobre o notch.
+
+| Item | Valor |
+|---|---|
+| Fechado | preto, largura = notch + asa direita, altura = altura do notch; asa 68 pt com contagem (36 pt sem), contendo `DropIndicator` + `Text("n/meta")` `.caption` `.monospacedDigit()` branco, a 4 pt |
+| Aberto | o `PanelView` abaixo do notch; largura `max(250, fechado)`, centralizado no notch, `colorScheme` forçado `.dark` |
+| Gatilho | hover (`NSTrackingArea`): abre após 120 ms, fecha 250 ms depois de o mouse sair |
+| Animação | `.smooth(duration: 0.3)` na forma (largura, altura, raio 10 → 16); conteúdo troca por opacidade; ao fechar espera 350 ms antes de reduzir a janela |
+| Janela | nível `mainMenu + 1`, `canJoinAllSpaces`, `stationary`, `fullScreenAuxiliary`; não ativa o app |
+| Fallback | sem notch, ou toggle desligado: volta o ícone da barra de menus |
 
 ---
 

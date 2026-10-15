@@ -10,6 +10,27 @@ struct Settings: Codable, Equatable {
     var startHour: Int = 8
     var endHour: Int = 22
     var showCountInBar: Bool = true
+    var useNotch: Bool = true
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case bottleML, goalBottles, intervalMin, startHour, endHour, showCountInBar, useNotch
+    }
+
+    // Decode manual: dado persistido de versões anteriores não tem os campos novos —
+    // sem isto, o decode falha e `Persisted` volta ao padrão, perdendo o histórico.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = Settings()
+        bottleML = try c.decodeIfPresent(Int.self, forKey: .bottleML) ?? d.bottleML
+        goalBottles = try c.decodeIfPresent(Int.self, forKey: .goalBottles) ?? d.goalBottles
+        intervalMin = try c.decodeIfPresent(Int.self, forKey: .intervalMin) ?? d.intervalMin
+        startHour = try c.decodeIfPresent(Int.self, forKey: .startHour) ?? d.startHour
+        endHour = try c.decodeIfPresent(Int.self, forKey: .endHour) ?? d.endHour
+        showCountInBar = try c.decodeIfPresent(Bool.self, forKey: .showCountInBar) ?? d.showCountInBar
+        useNotch = try c.decodeIfPresent(Bool.self, forKey: .useNotch) ?? d.useNotch
+    }
 }
 
 private struct Persisted: Codable {
@@ -109,6 +130,7 @@ final class HydrationStore {
         settings = newSettings
         persist()
         ReminderScheduler.shared.recompute()
+        NotchController.shared.refresh()
     }
 
     /// Binding genérico para um campo de Settings — usado pelos Steppers/Toggles do painel.

@@ -284,6 +284,12 @@ struct PanelView: View {
                 .toggleStyle(.switch)
                 .controlSize(.small)
                 .frame(height: 20)
+            if NotchController.shared.hasNotch {
+                Toggle("Mostrar no notch", isOn: store.binding(\.useNotch))
+                    .toggleStyle(.switch)
+                    .controlSize(.small)
+                    .frame(height: 20)
+            }
 
             Spacer().frame(height: 2)
 
