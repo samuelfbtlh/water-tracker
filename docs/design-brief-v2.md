@@ -24,7 +24,9 @@ puro, sem assets além do ícone do app.
   `Button` (`.bordered`, `.borderedProminent`, `.borderless`), `Stepper`,
   `Toggle`, `DisclosureGroup`, `Divider`, SF Symbols, SF Pro com text styles do
   sistema (`.headline`, `.body`, `.callout`, `.caption`).
-- **Uma única cor de acento**: `Color.accentColor` / systemBlue. Todo o resto em
+- **Uma única cor de acento**: systemBlue fixo (`Color.gotaAccent` +
+  `.tint(.gotaAccent)` na raiz do painel), não `Color.accentColor` — este segue o
+  acento do macOS e com "Grafite" deixava o botão e a barra cinzas. Todo o resto em
   cores semânticas do sistema (`.primary`, `.secondary`, `.quaternary`). Hoje há
   três tons de azul diferentes (gráfico, anel, botão) e isso precisa sumir.
 - Sem ícones custom, sem imagens, sem gradientes chamativos. Padrão Apple HIG,

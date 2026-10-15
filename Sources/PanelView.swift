@@ -12,6 +12,12 @@ final class PanelUIState {
     private init() {}
 }
 
+extension Color {
+    /// Acento único do painel, fixado em systemBlue. `Color.accentColor` segue o
+    /// acento do macOS e com "Grafite" deixava o "+1 garrafa" e a barra cinzas.
+    static let gotaAccent = Color(nsColor: .systemBlue)
+}
+
 struct PanelView: View {
     @Bindable var store = HydrationStore.shared
     @Bindable private var loginState = LoginItemUIState.shared
@@ -57,6 +63,7 @@ struct PanelView: View {
         .padding(.horizontal, 14)
         .padding(.bottom, 6)
         .frame(width: 250)
+        .tint(.gotaAccent)
         .onAppear { NotificationManager.shared.refreshStatus() }
         .onDisappear {
             uiState.settingsExpanded = false
@@ -80,7 +87,7 @@ struct PanelView: View {
                 if goalMet {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.body)
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Color.gotaAccent)
                 }
                 countText
             }
@@ -99,7 +106,7 @@ struct PanelView: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule().fill(.quaternary)
-                Capsule().fill(Color.accentColor)
+                Capsule().fill(Color.gotaAccent)
                     .frame(width: geo.size.width * progress)
             }
         }
@@ -128,9 +135,9 @@ struct PanelView: View {
     @ViewBuilder
     private func streakDot(_ day: StreakDay) -> some View {
         if day.met {
-            Circle().fill(Color.accentColor).frame(width: 5, height: 5)
+            Circle().fill(Color.gotaAccent).frame(width: 5, height: 5)
         } else if day.isToday {
-            Circle().strokeBorder(Color.accentColor, lineWidth: 1).frame(width: 5, height: 5)
+            Circle().strokeBorder(Color.gotaAccent, lineWidth: 1).frame(width: 5, height: 5)
         } else {
             Circle().fill(.quaternary).frame(width: 5, height: 5)
         }

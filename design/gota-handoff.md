@@ -16,7 +16,7 @@ Referências visuais em `states/` (PNG @2x, 1:1 = 250 pt de largura) e `icon/`.
 | Padding externo | top 12 · leading/trailing 14 · bottom 6 |
 | Spacing vertical entre seções | 8 (VStack raiz: `VStack(alignment: .leading, spacing: 8)`) |
 | Fonte | SF Pro via text styles do sistema (nunca `.system(size:)`) |
-| Cor de acento | `Color.accentColor` — único azul do painel. Aparece em exatamente 3 lugares: fill da barra, pontos de streak com meta batida, botão `.borderedProminent` |
+| Cor de acento | `Color.gotaAccent` = `Color(nsColor: .systemBlue)`, aplicado também como `.tint(.gotaAccent)` na raiz do painel — único azul do painel. Fixado em systemBlue (não `Color.gotaAccent`) porque com o acento "Grafite" do macOS o "+1 garrafa" e a barra ficavam cinzas. Aparece em exatamente 3 lugares: fill da barra, pontos de streak com meta batida, botão `.borderedProminent` |
 | Demais cores | `.primary`, `.secondary`, `.quaternary` (fills), `Divider()` padrão |
 | Ícones | SF Symbols, sempre `.imageScale(.small)` ou `font(.caption)` conforme tabela |
 | Animação | `withAnimation(.easeOut(duration: 0.2))` ao mudar a barra e os pontos; `.animation(.easeInOut(duration: 0.2))` ao expandir Ajustes. Nada mais anima. |
@@ -49,14 +49,14 @@ Referências visuais em `states/` (PNG @2x, 1:1 = 250 pt de largura) e `icon/`.
 |---|---|---|---|---|
 | "Gota" | `Text` | `.headline` | `.primary` | leading |
 | (só em notif. off) `bell.slash` | `Image(systemName:)` | `.caption` | `.secondary` | 6 pt à direita de "Gota". Ver estado 4 |
-| (só em meta batida) `checkmark.circle.fill` | `Image(systemName:)` | `.body` | `.accentColor` | 5 pt antes da contagem. Ver estado 3 |
+| (só em meta batida) `checkmark.circle.fill` | `Image(systemName:)` | `.body` | `Color.gotaAccent` | 5 pt antes da contagem. Ver estado 3 |
 | Contagem "**2** de 4 garrafas" | `Text` concatenado | `.body`; o número com `.fontWeight(.semibold)` | número `.primary`, resto `.secondary` | trailing (`Spacer()` entre) |
 
 ### [2] Barra de progresso
 | Elemento | Componente | Medidas | Cor |
 |---|---|---|---|
 | Trilho | `Capsule()` | altura 4, largura total | `.quaternary` (`.fill(.quaternary)`) |
-| Preenchimento | `Capsule()` sobreposto via `GeometryReader` ou `.overlay(alignment: .leading)` | altura 4, largura = `count / goal` × largura total | `Color.accentColor` |
+| Preenchimento | `Capsule()` sobreposto via `GeometryReader` ou `.overlay(alignment: .leading)` | altura 4, largura = `count / goal` × largura total | `Color.gotaAccent` |
 
 Não usar `ProgressView` — o estilo linear nativo tem 6 pt e borda própria. Duas `Capsule` é mais fiel.
 
@@ -116,7 +116,7 @@ Para alinhar com as bordas do texto acima: engrenagem com `.padding(.leading, -4
 | "Gota", número da contagem, labels de Ajustes, ícone da engrenagem quando ativo | `.primary` |
 | "de 4 garrafas", litros, "N dias", "−1", "Sair", engrenagem, `bell.slash`, valores dos steppers | `.secondary` |
 | Trilho da barra, pontos sem meta, fundo da engrenagem ativa | `.quaternary` |
-| Fill da barra, pontos com meta, anel de "hoje", botão prominente, `checkmark.circle.fill`, toggles ligados | `Color.accentColor` |
+| Fill da barra, pontos com meta, anel de "hoje", botão prominente, `checkmark.circle.fill`, toggles ligados | `Color.gotaAccent` |
 | Separadores | `Divider()` padrão |
 
 Nenhuma cor "de sucesso" (verde) na meta batida: continua accent. Nenhuma cor de alerta.
@@ -136,10 +136,10 @@ Nenhuma cor "de sucesso" (verde) na meta batida: continua accent. Nenhuma cor de
 
 | Dia | `metGoal` | Ponto |
 |---|---|---|
-| Passado | `true` | `Circle().fill(Color.accentColor)` |
+| Passado | `true` | `Circle().fill(Color.gotaAccent)` |
 | Passado | `false` / sem registro | `Circle().fill(.quaternary)` |
-| Hoje | `false` | `Circle().strokeBorder(Color.accentColor, lineWidth: 1)` (anel) |
-| Hoje | `true` | `Circle().fill(Color.accentColor)` |
+| Hoje | `false` | `Circle().strokeBorder(Color.gotaAccent, lineWidth: 1)` (anel) |
+| Hoje | `true` | `Circle().fill(Color.gotaAccent)` |
 
 Texto ao lado: `"\(streak) dias"` (`"1 dia"` no singular; `"0 dias"` quando zero — manter o texto, não esconder).
 
@@ -219,6 +219,7 @@ struct PanelView: View {
         .padding(.horizontal, 14)
         .padding(.bottom, 6)
         .frame(width: 250)
+        .tint(.gotaAccent)
         .onDisappear { settingsExpanded = false }
     }
 
@@ -233,7 +234,7 @@ struct PanelView: View {
             Spacer()
             if model.goalMet {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.body).foregroundStyle(Color.accentColor)
+                    .font(.body).foregroundStyle(Color.gotaAccent)
             }
             (Text("\(model.count)").fontWeight(.semibold)
              + Text(" de \(model.goal) garrafas").foregroundStyle(.secondary))
@@ -245,7 +246,7 @@ struct PanelView: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule().fill(.quaternary)
-                Capsule().fill(Color.accentColor)
+                Capsule().fill(Color.gotaAccent)
                     .frame(width: geo.size.width * model.progress) // min(count/goal, 1)
             }
         }
@@ -260,10 +261,10 @@ struct PanelView: View {
             HStack(spacing: 3) {
                 ForEach(model.last7Days) { day in
                     Circle()
-                        .fill(day.met ? Color.accentColor : Color.clear)
+                        .fill(day.met ? Color.gotaAccent : Color.clear)
                         .overlay {
                             if !day.met {
-                                if day.isToday { Circle().strokeBorder(Color.accentColor, lineWidth: 1) }
+                                if day.isToday { Circle().strokeBorder(Color.gotaAccent, lineWidth: 1) }
                                 else { Circle().fill(.quaternary) }
                             }
                         }
@@ -320,7 +321,7 @@ struct PanelView: View {
 ## 8. Checklist de aceite
 
 - [ ] Largura 250 pt; altura 132 pt no estado base, 374 pt com Ajustes
-- [ ] Nenhum `Color(hex:)`, `Color(red:green:blue:)` ou `.blue` no painel — só `Color.accentColor` e cores semânticas
+- [ ] Nenhum `Color(hex:)`, `Color(red:green:blue:)` ou `.blue` solto no painel — só `Color.gotaAccent` (systemBlue fixo) e cores semânticas
 - [ ] Nenhum `.background` no container (o `MenuBarExtra` fornece o material)
 - [ ] Nenhum `.font(.system(size:))` — só text styles
 - [ ] "−1" some em 0 garrafas; "+1 garrafa" vira `.bordered` ao bater a meta
