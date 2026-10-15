@@ -186,11 +186,14 @@ Com `Settings.useNotch == true` (padrão) e uma tela com `safeAreaInsets.top > 0
 | Item | Valor |
 |---|---|
 | Fechado | preto, largura = notch + asa direita, altura = altura do notch; asa 68 pt com contagem (36 pt sem), contendo `DropIndicator` + `Text("n/meta")` `.caption` `.monospacedDigit()` branco, a 4 pt |
-| Aberto | o `PanelView` abaixo do notch; largura `max(250, fechado)`, centralizado no notch, `colorScheme` forçado `.dark` |
-| Gatilho | hover (`NSTrackingArea`): abre após 120 ms, fecha 250 ms depois de o mouse sair |
-| Animação | `.smooth(duration: 0.3)` na forma (largura, altura, raio 10 → 16); conteúdo troca por opacidade; ao fechar espera 350 ms antes de reduzir a janela |
-| Janela | nível `mainMenu + 1`, `canJoinAllSpaces`, `stationary`, `fullScreenAuxiliary`; não ativa o app |
-| Fallback | sem notch, ou toggle desligado: volta o ícone da barra de menus |
+| Indicador | gota + contagem ficam sempre visíveis e no mesmo lugar, também com o painel aberto |
+| Aberto | o `PanelView` abaixo do notch; largura `max(250, fechado)`, ancorado na borda esquerda do notch, `colorScheme` forçado `.dark` e `controlActiveState = .key` (o painel não ativa o app; sem isso os botões ficam cinza até o primeiro clique) |
+| Abrir | hover (`NSTrackingArea` só sobre o indicador): o mouse precisa ficar parado 666 ms; sair antes cancela |
+| Fechar | só com clique fora (monitor global de `mouseDown`); o mouse sair do painel não fecha, e clique dentro do painel não fecha |
+| Animação | `.smooth(duration: 0.3)` na forma (largura, altura, raio 10 → 16); conteúdo entra por opacidade depois que a forma cresceu e sai de imediato ao fechar; mudança de altura (Ajustes) `.easeInOut(duration: 0.2)`; os Ajustes só são recolhidos 350 ms depois de fechar |
+| Janela | tamanho fixo (largura `max(250, fechado)` × altura do notch + 640 pt), no topo da tela; nunca é redimensionada — redimensionar uma janela ancorada no topo troca também a origem, e o AppKit faz as duas coisas em passos separados, o que piscava a janela fora do lugar por um quadro. A parte transparente deixa o clique passar para o app de baixo |
+| Janela (flags) | nível `mainMenu + 1`, `canJoinAllSpaces`, `stationary`, `fullScreenAuxiliary`; não ativa o app; funciona também sobre apps em tela cheia |
+| Fallback | sem notch, ou toggle desligado: volta o ícone da barra de menus; sem notch o toggle "Mostrar no notch" nem aparece em Ajustes |
 
 ---
 

@@ -19,13 +19,18 @@ private final class NotchPanel: NSPanel {
 /// não dispara de forma confiável em um painel que não está ativo.
 private final class NotchHostingView<Content: View>: NSHostingView<Content> {
     var onHover: ((Bool) -> Void)?
+    /// Área sensível ao mouse, no canto superior esquerdo. A janela é bem maior que o indicador
+    /// e quase toda transparente; o rastreamento da janela inteira abriria o painel à toa.
+    var hoverSize: CGSize = .zero { didSet { updateTrackingAreas() } }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         for area in trackingAreas where area.owner === self { removeTrackingArea(area) }
+        let rect = NSRect(x: 0, y: isFlipped ? 0 : bounds.height - hoverSize.height,
+                          width: hoverSize.width, height: hoverSize.height)
         addTrackingArea(NSTrackingArea(
-            rect: .zero,
-            options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect],
+            rect: rect,
+            options: [.mouseEnteredAndExited, .activeAlways],
             owner: self,
             userInfo: nil
         ))
@@ -35,9 +40,16 @@ private final class NotchHostingView<Content: View>: NSHostingView<Content> {
     override func mouseExited(with event: NSEvent) { onHover?(false) }
 }
 
-/// Mostra o Gota no notch dos MacBooks que têm um: um indicador recolhido
-/// (gota + contagem) que expande o `PanelView` ao passar o mouse. Quando ativo,
-/// substitui o ícone da barra de menus (`GotaApp` consulta `isActive`).
+/// Mostra o Gota no notch dos MacBooks que têm um: um indicador (gota + contagem) à
+/// direita do recorte que, depois de o mouse ficar sobre ele, expande o `PanelView`
+/// para baixo. O indicador nunca sai do lugar; o painel só fecha com um clique fora.
+/// Quando ativo, substitui o ícone da barra de menus (`GotaApp` consulta `isActive`).
+///
+/// A janela nunca muda de tamanho: ela tem a altura máxima do painel e só a forma preta
+/// (SwiftUI) cresce e encolhe dentro dela. Redimensionar uma janela ancorada no topo muda
+/// também a origem dela, e o AppKit faz as duas coisas em passos separados — o que piscava
+/// a janela fora do lugar por um quadro. As partes transparentes deixam o clique passar
+/// para o app de baixo.
 @MainActor
 @Observable
 final class NotchController {
@@ -52,9 +64,16 @@ final class NotchController {
     /// Largura da "asa" à direita do recorte (gota + contagem, como no ícone da barra).
     static func wing(showCount: Bool) -> CGFloat { showCount ? 68 : 36 }
     static let panelWidth: CGFloat = 250
-    /// Duração da animação de abrir/fechar; a janela só encolhe depois dela.
+    /// Folga de altura da janela abaixo do notch: maior que o `PanelView` com os Ajustes abertos.
+    static let maxPanelHeight: CGFloat = 640
+    /// Abrir/fechar a forma.
     static let animation: Animation = .smooth(duration: 0.3)
-    private static let collapseDelay: Duration = .milliseconds(350)
+    /// Mudança de altura (Ajustes abrindo/fechando): mesma curva do `PanelView`.
+    static let heightAnimation: Animation = .easeInOut(duration: 0.2)
+    /// Quanto o mouse precisa ficar sobre o indicador para o painel abrir.
+    private static let openDelay: Duration = .milliseconds(666)
+    /// Depois de fechado, quanto esperar para recolher os Ajustes sem aparecer na animação.
+    private static let resetDelay: Duration = .milliseconds(350)
 
     static func collapsedWidth(for notch: NotchGeometry, showCount: Bool) -> CGFloat {
         notch.width + wing(showCount: showCount)
@@ -64,22 +83,19 @@ final class NotchController {
         max(panelWidth, collapsedWidth(for: notch, showCount: showCount))
     }
 
-    /// Existe uma tela com notch conectada.
+    /// Existe uma tela com notch conectada. Sem ela, a opção "Mostrar no notch" nem aparece.
     var hasNotch: Bool { geometry != nil }
 
     /// O notch está efetivamente no lugar do ícone da barra.
     var isActive: Bool { geometry != nil && HydrationStore.shared.settings.useNotch }
 
     @ObservationIgnored private var panel: NotchPanel?
+    @ObservationIgnored private var hostingView: NotchHostingView<NotchRootView>?
     @ObservationIgnored private var screen: NSScreen?
     @ObservationIgnored private var hoverTask: Task<Void, Never>?
-    @ObservationIgnored private var transitionTask: Task<Void, Never>?
+    @ObservationIgnored private var resetTask: Task<Void, Never>?
+    @ObservationIgnored private var clickMonitor: Any?
     @ObservationIgnored private var fitScheduled = false
-    /// A janela está dimensionada (e centralizada) para o painel aberto, o que inclui o
-    /// tempo da animação de fechar. Fechada, a janela começa na borda esquerda do recorte.
-    private(set) var windowOpen = false
-    /// Destino pedido pelo mouse; `expanded` só muda depois que a janela foi reposicionada.
-    @ObservationIgnored private var wantsExpanded = false
 
     private init() {
         let found = Self.notchScreen()
@@ -111,83 +127,83 @@ final class NotchController {
         }
     }
 
-    // MARK: - Hover
+    // MARK: - Abrir e fechar
 
-    /// O hover só sugere uma mudança; a decisão final usa a posição real do mouse,
-    /// porque o painel redimensiona e o SwiftUI pode perder o evento de saída.
+    /// Só o mouse parado sobre o indicador abre; sair antes do prazo cancela. Com o painel
+    /// aberto o hover é ignorado: ele só fecha por clique fora (`collapse`).
     func hoverChanged(_ inside: Bool) {
         hoverTask?.cancel()
+        guard inside, !expanded else { return }
         hoverTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(for: .milliseconds(inside ? 120 : 250))
-            guard !Task.isCancelled, let self, let panel = self.panel else { return }
-            let reallyInside = panel.frame.insetBy(dx: -1, dy: -1).contains(NSEvent.mouseLocation)
-            self.setExpanded(reallyInside)
+            try? await Task.sleep(for: Self.openDelay)
+            // A decisão final usa a posição real do mouse: o evento de saída pode se perder.
+            guard !Task.isCancelled, let self, let rect = self.indicatorRect(),
+                  rect.insetBy(dx: -1, dy: -1).contains(NSEvent.mouseLocation) else { return }
+            self.expand()
         }
     }
 
-    /// Abrir: a janela vai ao tamanho final (centralizada) e só então a forma anima.
-    /// Fechar: a forma anima primeiro; a janela só encolhe quando a animação termina.
-    private func setExpanded(_ value: Bool) {
-        guard value != wantsExpanded else { return }
-        wantsExpanded = value
-        transitionTask?.cancel()
-        transitionTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            if value {
-                NotificationManager.shared.refreshStatus()
-                await self.reframe(open: true)
-                guard !Task.isCancelled else { return }
-                self.expanded = true
-            } else {
-                self.expanded = false
-                try? await Task.sleep(for: Self.collapseDelay)
-                guard !Task.isCancelled else { return }
-                PanelUIState.shared.settingsExpanded = false
-                await self.reframe(open: false)
-            }
-        }
+    private func expand() {
+        guard !expanded else { return }
+        resetTask?.cancel()
+        NotificationManager.shared.refreshStatus()
+        expanded = true
     }
 
-    /// Troca a janela entre "fechada" (colada ao recorte) e "aberta" (centralizada).
-    /// A view muda o deslocamento da forma junto com a janela; esconder a janela por
-    /// um instante evita que apareça um quadro com os dois fora de sincronia.
-    private func reframe(open: Bool) async {
-        guard windowOpen != open else { fit(); return }
-        panel?.alphaValue = 0
-        windowOpen = open
-        try? await Task.sleep(for: .milliseconds(40))
-        fit()
-        panel?.alphaValue = 1
+    private func collapse() {
+        guard expanded else { return }
+        hoverTask?.cancel()
+        expanded = false
+        resetTask?.cancel()
+        resetTask = Task { @MainActor in
+            try? await Task.sleep(for: Self.resetDelay)
+            guard !Task.isCancelled else { return }
+            PanelUIState.shared.settingsExpanded = false
+        }
     }
 
     func panelHeightChanged(_ height: CGFloat) {
         guard abs(height - panelHeight) > 0.5 else { return }
         panelHeight = height
-        scheduleFit()
     }
 
     // MARK: - Painel
 
     private func showPanel() {
         if panel == nil { buildPanel() }
+        installClickMonitor()
         scheduleFit()
         panel?.orderFrontRegardless()
     }
 
     private func hidePanel() {
         hoverTask?.cancel()
-        transitionTask?.cancel()
-        wantsExpanded = false
+        resetTask?.cancel()
+        removeClickMonitor()
         expanded = false
-        windowOpen = false
         PanelUIState.shared.settingsExpanded = false
-        panel?.alphaValue = 1
         panel?.orderOut(nil)
+    }
+
+    /// Clique em qualquer outro lugar fecha o painel. Cliques dentro do painel são
+    /// entregues à janela e não chegam ao monitor global.
+    private func installClickMonitor() {
+        guard clickMonitor == nil else { return }
+        clickMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] _ in
+            Task { @MainActor in self?.collapse() }
+        }
+    }
+
+    private func removeClickMonitor() {
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
+        clickMonitor = nil
     }
 
     private func buildPanel() {
         let view = NotchHostingView(rootView: NotchRootView(controller: self))
-        // O tamanho da janela é calculado em `fit()`; o hosting view não deve impor limites.
+        // O tamanho da janela é calculado em `targetFrame()`; o hosting view não deve impor limites.
         view.sizingOptions = []
         view.onHover = { [weak self] inside in
             Task { @MainActor in self?.hoverChanged(inside) }
@@ -214,37 +230,53 @@ final class NotchController {
         panel.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
 
         self.panel = panel
+        self.hostingView = view
     }
 
     private func scheduleFit() {
         guard !fitScheduled else { return }
         fitScheduled = true
-        DispatchQueue.main.async { [weak self] in self?.fit() }
+        DispatchQueue.main.async { [weak self] in
+            self?.fitScheduled = false
+            self?.applyFrame()
+        }
     }
 
-    /// Fechado: colada à borda esquerda do recorte, estendendo-se só para a direita (a
-    /// esquerda fica livre para os menus dos apps). Aberto: centralizada no recorte.
-    private func fit() {
-        fitScheduled = false
-        guard let panel, let screen, let notch = geometry else { return }
+    private func applyFrame() {
+        guard let panel, let target = targetFrame() else { return }
+        if let notch = geometry {
+            hostingView?.hoverSize = CGSize(
+                width: Self.collapsedWidth(for: notch, showCount: HydrationStore.shared.settings.showCountInBar),
+                height: notch.height
+            )
+        }
+        if panel.frame != target { panel.setFrame(target, display: true) }
+    }
+
+    /// Colada à borda esquerda do recorte e ao topo da tela, sempre com a altura máxima.
+    private func targetFrame() -> NSRect? {
+        guard let screen, let notch = geometry else { return nil }
         let showCount = HydrationStore.shared.settings.showCountInBar
-        let size = windowOpen
-            ? CGSize(width: Self.expandedWidth(for: notch, showCount: showCount),
-                     height: notch.height + panelHeight)
-            : CGSize(width: Self.collapsedWidth(for: notch, showCount: showCount),
-                     height: notch.height)
-        let x = windowOpen
-            ? screen.frame.midX - size.width / 2
-            : screen.frame.midX - notch.width / 2
-        let frame = NSRect(
-            x: x.rounded(),
+        let size = CGSize(width: Self.expandedWidth(for: notch, showCount: showCount),
+                          height: notch.height + Self.maxPanelHeight)
+        return NSRect(
+            x: (screen.frame.midX - notch.width / 2).rounded(),
             y: screen.frame.maxY - size.height,
             width: size.width,
             height: size.height
         )
-        if panel.frame != frame {
-            panel.setFrame(frame, display: true)
-        }
+    }
+
+    /// Retângulo do indicador, em coordenadas de tela.
+    private func indicatorRect() -> NSRect? {
+        guard let panel, let notch = geometry else { return nil }
+        let showCount = HydrationStore.shared.settings.showCountInBar
+        return NSRect(
+            x: panel.frame.minX,
+            y: panel.frame.maxY - notch.height,
+            width: Self.collapsedWidth(for: notch, showCount: showCount),
+            height: notch.height
+        )
     }
 
     // MARK: - Geometria
@@ -275,41 +307,39 @@ struct NotchRootView: View {
         let open = controller.expanded
         let collapsedWidth = NotchController.collapsedWidth(for: notch, showCount: showCount)
         let expandedWidth = NotchController.expandedWidth(for: notch, showCount: showCount)
-        // Com a janela aberta (centralizada) a forma recolhida precisa ficar sobre o recorte,
-        // não na borda da janela; com a janela fechada ela já começa na borda esquerda do recorte.
-        let leading: CGFloat = (open || !controller.windowOpen) ? 0 : (expandedWidth - notch.width) / 2
         let radius: CGFloat = open ? 16 : 10
         let shape = UnevenRoundedRectangle(bottomLeadingRadius: radius, bottomTrailingRadius: radius)
 
-        // Os dois conteúdos coexistem e se alternam por opacidade; a forma preta
-        // (largura × altura) é o que anima, "descendo" do recorte.
-        ZStack(alignment: .top) {
-            collapsedContent(notch: notch, showCount: showCount)
-                .frame(width: collapsedWidth)
-                .opacity(open ? 0 : 1)
+        // O indicador fica sempre no mesmo lugar (faixa do recorte); o painel aparece por
+        // opacidade abaixo dele, e a forma preta (largura × altura) é o que anima.
+        ZStack(alignment: .topLeading) {
             expandedContent(notch: notch, width: expandedWidth)
                 .opacity(open ? 1 : 0)
                 // Ao abrir, o conteúdo só aparece depois de a forma já ter crescido até ele;
                 // ao fechar, some de imediato para não vazar para fora da forma que encolhe.
                 .animation(open ? .easeIn(duration: 0.12).delay(0.14) : .easeOut(duration: 0.08), value: open)
                 .allowsHitTesting(open)
+            indicator(notch: notch, showCount: showCount)
+                .frame(width: collapsedWidth, alignment: .leading)
         }
         .frame(
             width: open ? expandedWidth : collapsedWidth,
             height: open ? notch.height + controller.panelHeight : notch.height,
-            alignment: .top
+            alignment: .topLeading
         )
         .background(Color.black, in: shape)
         .clipShape(shape)
         .environment(\.colorScheme, .dark)
-        .padding(.leading, leading)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // O painel não ativa o app; sem isto os controles ficam com o visual inativo (cinza)
+        // até o primeiro clique.
+        .environment(\.controlActiveState, .key)
         .animation(NotchController.animation, value: open)
-        .animation(.easeOut(duration: 0.2), value: controller.panelHeight)
+        .animation(NotchController.heightAnimation, value: controller.panelHeight)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     /// Gota e contagem juntas, à direita do recorte — igual ao rótulo da barra de menus.
-    private func collapsedContent(notch: NotchGeometry, showCount: Bool) -> some View {
+    private func indicator(notch: NotchGeometry, showCount: Bool) -> some View {
         HStack(spacing: 0) {
             Color.clear.frame(width: notch.width)
             HStack(spacing: 4) {
