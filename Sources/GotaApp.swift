@@ -21,7 +21,10 @@ struct GotaApp: App {
         let goal = store.settings.goalBottles
         let symbol = dropSymbol(count: count, goal: goal)
         if store.settings.showCountInBar {
-            Label("\(count)/\(goal)", systemImage: symbol)
+            HStack(spacing: 4) {
+                Image(systemName: symbol)
+                Text("\(count)/\(goal)")
+            }
         } else {
             Image(systemName: symbol)
         }
