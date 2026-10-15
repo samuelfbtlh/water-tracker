@@ -56,6 +56,7 @@ struct PanelView: View {
         .padding(.horizontal, 14)
         .padding(.bottom, 6)
         .frame(width: 250)
+        .onAppear { NotificationManager.shared.refreshStatus() }
         .onDisappear { uiState.settingsExpanded = false }
     }
 

@@ -3,6 +3,7 @@ import UserNotifications
 import AppKit
 
 @MainActor
+@Observable
 final class NotificationManager: NSObject {
     static let shared = NotificationManager()
 
@@ -11,7 +12,8 @@ final class NotificationManager: NSObject {
     private static let drinkActionId = "DRINK"
     private static let snoozeActionId = "SNOOZE"
 
-    private(set) var authorizationDenied = false
+    private(set) var authorized = false
+    var authorizationDenied: Bool { !authorized }
 
     private override init() {}
 
@@ -37,9 +39,22 @@ final class NotificationManager: NSObject {
         )
         center.setNotificationCategories([category])
 
-        center.requestAuthorization(options: [.alert, .sound]) { [weak self] granted, _ in
+        center.requestAuthorization(options: [.alert, .sound]) { [weak self] _, _ in
             Task { @MainActor in
-                self?.authorizationDenied = !granted
+                self?.refreshStatus()
+            }
+        }
+    }
+
+    /// Relê a autorização real do sistema — o resultado do `requestAuthorization`
+    /// fica stale se o usuário muda a permissão depois (Ajustes do Sistema), então
+    /// o painel precisa reconsultar toda vez que abre (ver `PanelView.onAppear`).
+    func refreshStatus() {
+        UNUserNotificationCenter.current().getNotificationSettings { [weak self] settings in
+            let isAuthorized = settings.authorizationStatus == .authorized
+                || settings.authorizationStatus == .provisional
+            Task { @MainActor in
+                self?.authorized = isAuthorized
             }
         }
     }
